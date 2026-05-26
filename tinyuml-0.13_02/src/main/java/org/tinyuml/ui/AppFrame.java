@@ -63,6 +63,11 @@ import org.tinyuml.ui.diagram.EditorStateListener;
 import org.tinyuml.ui.diagram.SelectionListener;
 import org.tinyuml.util.ApplicationResources;
 import org.tinyuml.util.MethodCall;
+import javax.swing.SwingConstants;
+import org.tinyuml.draw.AbstractCompositeNode;
+import org.tinyuml.umldraw.structure.PackageElement;
+import org.tinyuml.umldraw.structure.ClassElement;
+import org.tinyuml.umldraw.structure.ComponentElement;
 
 /**
  * This class implements the Application frame. The top-level UI elements are
@@ -80,6 +85,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private JTabbedPane tabbedPane;
   private JLabel coordLabel = new JLabel("    ");
   private JLabel memLabel = new JLabel("    ");
+  private JLabel itemsLabel = new JLabel("Total Items : 00; Package:00, Class:00; Component: 00", SwingConstants.CENTER);
   private UmlModel umlModel;
   private DiagramEditor currentEditor;
   private transient Timer timer = new Timer();
@@ -213,6 +219,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
                               label.getText());
       }
     });
+    updateItemCount();
   }
 
   /**
@@ -241,6 +248,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
   private void installStatusbar() {
     JPanel statusbar = new JPanel(new BorderLayout());
     statusbar.add(coordLabel, BorderLayout.WEST);
+    statusbar.add(itemsLabel, BorderLayout.CENTER);
     statusbar.add(memLabel, BorderLayout.EAST);
     getContentPane().add(statusbar, BorderLayout.SOUTH);
   }
@@ -275,6 +283,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
    */
   public void stateChanged(DiagramEditor editor) {
     updateMenuAndToolbars(editor);
+    updateItemCount();
   }
 
   /**
@@ -284,6 +293,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
     // spring loading is implemented here
     staticToolbarManager.doClick("SELECT_MODE");
     updateMenuAndToolbars(editor);
+    updateItemCount();
   }
 
   /**
@@ -291,6 +301,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
    */
   public void elementRemoved(DiagramEditor editor) {
     updateMenuAndToolbars(editor);
+    updateItemCount();
   }
 
   /**
@@ -629,7 +640,7 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
 	  if(hasSelection)
 	    lastCopiedElements = getCurrentEditor().getSelectedElements();
 
-	  //adicionalmente, hay que habilitar el botón PASTE!
+	  //adicionalmente, hay que habilitar el botï¿½n PASTE!
 	  menumanager.enableMenuItem("PASTE", hasSelection);
 	  toolbarmanager.enableButton("PASTE", hasSelection);
   }
@@ -668,6 +679,45 @@ implements EditorStateListener, AppCommandListener, SelectionListener {
         JOptionPane.ERROR_MESSAGE);
     } catch (URISyntaxException ignore) {
       ignore.printStackTrace();
+    }
+  }
+
+  /**
+   * Updates the counter label in the status bar with the current count of elements.
+   */
+  public void updateItemCount() {
+    int packages = 0;
+    int classes = 0;
+    int components = 0;
+    if (currentEditor != null && currentEditor.getDiagram() != null) {
+      int[] counts = new int[3]; // [packages, classes, components]
+      countElements(currentEditor.getDiagram(), counts);
+      packages = counts[0];
+      classes = counts[1];
+      components = counts[2];
+    }
+    int totalItems = packages + classes + components;
+    itemsLabel.setText(String.format("Total Items : %02d; Package:%02d, Class:%02d; Component: %02d",
+        totalItems, packages, classes, components));
+  }
+
+  private void countElements(AbstractCompositeNode compositeNode, int[] counts) {
+    if (compositeNode == null || compositeNode.getChildren() == null) {
+      return;
+    }
+    for (DiagramElement child : compositeNode.getChildren()) {
+      if (child instanceof PackageElement) {
+        counts[0]++;
+        countElements((PackageElement) child, counts);
+      } else if (child instanceof ClassElement) {
+        counts[1]++;
+        countElements((ClassElement) child, counts);
+      } else if (child instanceof ComponentElement) {
+        counts[2]++;
+        countElements((ComponentElement) child, counts);
+      } else if (child instanceof AbstractCompositeNode) {
+        countElements((AbstractCompositeNode) child, counts);
+      }
     }
   }
 }
